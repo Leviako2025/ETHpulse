@@ -1,0 +1,6 @@
+{
+  "name": "EtherPulse - Live ERC-20 Token Analytics & On-Chain Intelligence",
+  "description": "Real-time Ethereum ERC-20 token analytics platform monitoring live price, DEX liquidity, whale wallet movements, smart contract safety audits, transaction flows, and optimized Web3 SQL generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
