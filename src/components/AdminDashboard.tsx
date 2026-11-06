@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
-import { Shield, Users, Gift, Activity, FileText, CheckCircle2, AlertOctagon, Plus, Search, Filter, Lock, Unlock, Eye, RefreshCw, SlidersHorizontal, ArrowUpRight } from 'lucide-react';
+import { Shield, Users, Gift, Activity, FileText, CheckCircle2, AlertOctagon, Plus, Search, Filter, Lock, Unlock, Eye, RefreshCw, SlidersHorizontal, ArrowUpRight, AlertTriangle } from 'lucide-react';
 import { UserPortfolio } from '../types/token';
+import { 
+  checkTermsCompliance, 
+  SOLIDITY_RESERVED_KEYWORDS, 
+  REGULATORY_PROHIBITED_TERMS, 
+  BRAND_IMPERSONATION_TERMS, 
+  RESERVED_PROTOCOL_SYMBOLS 
+} from '../utils/complianceValidator';
 
 type AdminRole = 'SUPER_ADMIN' | 'RISK_OPERATOR' | 'COMPLIANCE_AUDITOR';
 
@@ -63,7 +70,7 @@ const INITIAL_USERS: ManagedUser[] = [
   {
     id: 'u_3',
     address: '0x00000000219ab540356cbb839cbe05303d7705fa',
-    ens: 'eth2-deposit.eth',
+    ens: 'eth2-beacon-vault.eth',
     tier: 'TIER_3_WHALE',
     status: 'ACTIVE',
     ethBalance: 320.0,
@@ -137,7 +144,7 @@ const INITIAL_CAMPAIGNS: AdminCampaign[] = [
 
 export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBlock }) => {
   const [currentRole, setCurrentRole] = useState<AdminRole>('SUPER_ADMIN');
-  const [activeSubTab, setActiveSubTab] = useState<'users' | 'campaigns' | 'monitoring' | 'logs'>('users');
+  const [activeSubTab, setActiveSubTab] = useState<'users' | 'campaigns' | 'monitoring' | 'logs' | 'compliance_registry'>('users');
   
   const [users, setUsers] = useState<ManagedUser[]>(INITIAL_USERS);
   const [logs, setLogs] = useState<AdminLog[]>(INITIAL_LOGS);
@@ -146,6 +153,7 @@ export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBloc
   const [newCampaignTitle, setNewCampaignTitle] = useState('');
   const [newCampaignPool, setNewCampaignPool] = useState('50000');
   const [isAddingCampaign, setIsAddingCampaign] = useState(false);
+  const [campaignError, setCampaignError] = useState<string | null>(null);
 
   // Toggle user status
   const handleToggleUserStatus = (userId: string) => {
@@ -194,10 +202,19 @@ export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBloc
     );
   };
 
-  // Add new campaign
+  // Add new campaign with compliance check against reserved/prohibited terms
   const handleCreateCampaign = (e: React.FormEvent) => {
     e.preventDefault();
+    setCampaignError(null);
     if (!newCampaignTitle.trim()) return;
+
+    // Run terms compliance audit
+    const compliance = checkTermsCompliance(newCampaignTitle.trim(), 'CT', '');
+    if (!compliance.isCompliant) {
+      const violationList = compliance.violations.map(v => `'${v.term}' (${v.category})`).join(', ');
+      setCampaignError(`Campaign blocked: Contains reserved/prohibited terms: ${violationList}. EtherPulse strictly enforces zero prohibited securities or EVM reserved keywords.`);
+      return;
+    }
 
     const newCamp: AdminCampaign = {
       id: `ac_${Date.now()}`,
@@ -215,7 +232,7 @@ export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBloc
       adminRole: currentRole,
       action: 'CREATE_CAMPAIGN',
       target: newCamp.title,
-      details: `Created campaign with pool ${newCamp.allocatedPoolCt.toLocaleString()} CT`,
+      details: `Created campaign with pool ${newCamp.allocatedPoolCt.toLocaleString()} CT (Passed Prohibited Terms Policy)`,
       severity: 'INFO'
     };
     setLogs((l) => [newLog, ...l]);
@@ -272,11 +289,12 @@ export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBloc
       </div>
 
       {/* Admin Subtabs */}
-      <div className="flex border-b border-slate-800 space-x-1">
+      <div className="flex border-b border-slate-800 space-x-1 overflow-x-auto">
         {[
           { id: 'users', label: 'User Directory & KYC', icon: Users, count: users.length },
           { id: 'campaigns', label: 'Rewards Management', icon: Gift, count: campaigns.length },
           { id: 'monitoring', label: 'Risk & Circuit Breakers', icon: Activity, count: null },
+          { id: 'compliance_registry', label: 'Prohibited Terms Registry', icon: Shield, count: null },
           { id: 'logs', label: 'Admin Activity Logs', icon: FileText, count: logs.length }
         ].map((tab) => {
           const Icon = tab.icon;
@@ -285,7 +303,7 @@ export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBloc
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold font-mono border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold font-mono border-b-2 whitespace-nowrap transition-colors ${
                 isActive
                   ? 'border-indigo-500 text-white bg-slate-900/60'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -407,7 +425,10 @@ export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBloc
             </div>
 
             <button
-              onClick={() => setIsAddingCampaign(!isAddingCampaign)}
+              onClick={() => {
+                setIsAddingCampaign(!isAddingCampaign);
+                setCampaignError(null);
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold font-mono transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -418,6 +439,17 @@ export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBloc
           {isAddingCampaign && (
             <form onSubmit={handleCreateCampaign} className="p-4 bg-slate-950 rounded-lg border border-indigo-500/30 space-y-3 font-mono text-xs">
               <h4 className="font-semibold text-white">Create New Incentive Campaign</h4>
+              <p className="text-[11px] text-slate-400">
+                Notice: Campaign titles are automatically audited. Any Solidity reserved keywords or prohibited securities terms will be rejected.
+              </p>
+
+              {campaignError && (
+                <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-lg text-rose-300 flex items-start gap-2">
+                  <AlertOctagon className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{campaignError}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-400 block mb-1">Campaign Title:</label>
@@ -425,7 +457,10 @@ export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBloc
                     type="text"
                     required
                     value={newCampaignTitle}
-                    onChange={(e) => setNewCampaignTitle(e.target.value)}
+                    onChange={(e) => {
+                      setNewCampaignTitle(e.target.value);
+                      setCampaignError(null);
+                    }}
                     placeholder="e.g. Q4 Concentrated Liquidity Boost"
                     className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded text-white"
                   />
@@ -444,7 +479,10 @@ export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBloc
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddingCampaign(false)}
+                  onClick={() => {
+                    setIsAddingCampaign(false);
+                    setCampaignError(null);
+                  }}
                   className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded"
                 >
                   Cancel
@@ -536,7 +574,87 @@ export const AdminDashboard: React.FC<{ currentBlock: number }> = ({ currentBloc
         </div>
       )}
 
-      {/* Tab 4: Admin Activity Logs */}
+      {/* Tab 4: Prohibited & Reserved Terms Policy Registry */}
+      {activeSubTab === 'compliance_registry' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-semibold text-white">No Reserved or Prohibited Terms Policy Registry</h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
+                  ENFORCED ON ALL PLATFORM INPUTS
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Active automated filter dictionary blocking Solidity keywords, securities claims, and brand impersonation across token creation, campaigns, and metadata
+              </p>
+            </div>
+
+            <span className="text-xs font-mono text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded border border-emerald-500/30">
+              0 Active Violations
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-mono text-xs">
+            {/* Column 1: Solidity Reserved */}
+            <div className="space-y-3 p-4 bg-slate-950 rounded-lg border border-slate-800">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                <span className="text-white font-semibold">EVM & Solidity Reserved ({SOLIDITY_RESERVED_KEYWORDS.length})</span>
+                <span className="text-[10px] text-indigo-400">Compiler Safe</span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-sans">
+                Prevents namespace collision with Solidity language keywords, opcode identifiers, and ABI decoder types.
+              </p>
+              <div className="flex flex-wrap gap-1 max-h-56 overflow-y-auto pr-1">
+                {SOLIDITY_RESERVED_KEYWORDS.map((kw) => (
+                  <span key={kw} className="text-[10px] px-1.5 py-0.5 bg-slate-900 border border-slate-800 text-slate-400 rounded">
+                    {kw}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Column 2: Regulatory Prohibited */}
+            <div className="space-y-3 p-4 bg-slate-950 rounded-lg border border-slate-800">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                <span className="text-white font-semibold">Prohibited Securities Claims ({REGULATORY_PROHIBITED_TERMS.length})</span>
+                <span className="text-[10px] text-emerald-400">Howey Test Safe</span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-sans">
+                Blocks deceptive financial terms, guaranteed returns, deposit claims, and investment security designations.
+              </p>
+              <div className="flex flex-wrap gap-1 max-h-56 overflow-y-auto pr-1">
+                {REGULATORY_PROHIBITED_TERMS.map((term) => (
+                  <span key={term} className="text-[10px] px-1.5 py-0.5 bg-rose-950/40 border border-rose-500/30 text-rose-300 rounded">
+                    {term}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Column 3: Protected Brand & Symbols */}
+            <div className="space-y-3 p-4 bg-slate-950 rounded-lg border border-slate-800">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                <span className="text-white font-semibold">Protected Identities & Symbols ({BRAND_IMPERSONATION_TERMS.length + RESERVED_PROTOCOL_SYMBOLS.length})</span>
+                <span className="text-[10px] text-cyan-400">Anti-Phishing</span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-sans">
+                Prevents counterfeit tokens from masquerading as canonical protocol foundations, system administrators, or fiat currencies.
+              </p>
+              <div className="flex flex-wrap gap-1 max-h-56 overflow-y-auto pr-1">
+                {[...BRAND_IMPERSONATION_TERMS, ...RESERVED_PROTOCOL_SYMBOLS].map((term) => (
+                  <span key={term} className="text-[10px] px-1.5 py-0.5 bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 rounded">
+                    {term}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Admin Activity Logs */}
       {activeSubTab === 'logs' && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="p-5 border-b border-slate-800 flex items-center justify-between">

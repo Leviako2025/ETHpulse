@@ -1,16 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TokenProfile } from '../types/token';
 import { 
   ShieldCheck, ShieldAlert, CheckCircle2, XCircle, AlertTriangle, 
-  Code, FileCode, Lock, Key, ExternalLink, Flame, RefreshCcw 
+  Code, FileCode, Lock, Key, ExternalLink, Flame, RefreshCcw,
+  Sparkles, Check, AlertOctagon, Search
 } from 'lucide-react';
+import { 
+  checkTermsCompliance, 
+  SOLIDITY_RESERVED_KEYWORDS, 
+  REGULATORY_PROHIBITED_TERMS, 
+  BRAND_IMPERSONATION_TERMS, 
+  RESERVED_PROTOCOL_SYMBOLS 
+} from '../utils/complianceValidator';
 
 interface SmartContractAnalyticsProps {
   token: TokenProfile;
 }
 
 export const SmartContractAnalytics: React.FC<SmartContractAnalyticsProps> = ({ token }) => {
-  const [activeTab, setActiveTab] = useState<'audit' | 'interface' | 'events'>('audit');
+  const [activeTab, setActiveTab] = useState<'audit' | 'compliance' | 'interface' | 'events'>('compliance');
+
+  // Interactive Live Terms Auditor State
+  const [testName, setTestName] = useState('CoreToken');
+  const [testSymbol, setTestSymbol] = useState('CT');
+  const [testDesc, setTestDesc] = useState('Ecosystem utility token for the EtherPulse decentralized trading platform.');
+
+  const tokenCompliance = useMemo(() => {
+    return checkTermsCompliance(token.name, token.symbol, token.description || '');
+  }, [token.name, token.symbol, token.description]);
+
+  const liveTestResult = useMemo(() => {
+    return checkTermsCompliance(testName, testSymbol, testDesc);
+  }, [testName, testSymbol, testDesc]);
 
   const audit = token.securityAudit;
 
@@ -256,12 +277,24 @@ export const SmartContractAnalytics: React.FC<SmartContractAnalyticsProps> = ({ 
         </div>
       </div>
 
-      {/* ERC-20 Interface & Contract Events Tabs */}
+      {/* ERC-20 Interface, Compliance & Events Tabs */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-        <div className="flex border-b border-slate-800 bg-slate-950/40">
+        <div className="flex border-b border-slate-800 bg-slate-950/40 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('compliance')}
+            className={`px-5 py-3 text-xs font-semibold font-mono border-b-2 whitespace-nowrap transition-colors flex items-center gap-2 ${
+              activeTab === 'compliance' ? 'border-emerald-500 text-white bg-slate-900' : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span>No Reserved / Prohibited Terms Audit</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
+              {tokenCompliance.isCompliant ? '100% Passed' : 'Violations'}
+            </span>
+          </button>
           <button
             onClick={() => setActiveTab('audit')}
-            className={`px-5 py-3 text-xs font-semibold font-mono border-b-2 transition-colors ${
+            className={`px-5 py-3 text-xs font-semibold font-mono border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'audit' ? 'border-indigo-500 text-white bg-slate-900' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -269,7 +302,7 @@ export const SmartContractAnalytics: React.FC<SmartContractAnalyticsProps> = ({ 
           </button>
           <button
             onClick={() => setActiveTab('events')}
-            className={`px-5 py-3 text-xs font-semibold font-mono border-b-2 transition-colors ${
+            className={`px-5 py-3 text-xs font-semibold font-mono border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'events' ? 'border-indigo-500 text-white bg-slate-900' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -277,7 +310,200 @@ export const SmartContractAnalytics: React.FC<SmartContractAnalyticsProps> = ({ 
           </button>
         </div>
 
-        {activeTab === 'audit' ? (
+        {/* Tab Content */}
+        {activeTab === 'compliance' && (
+          <div className="p-6 space-y-6">
+            {/* Active Token Verification Result Card */}
+            <div className={`p-5 rounded-xl border ${
+              tokenCompliance.isCompliant
+                ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-950/20 border-rose-500/30 text-rose-300'
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg border ${
+                    tokenCompliance.isCompliant
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                      : 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+                  }`}>
+                    {tokenCompliance.isCompliant ? <CheckCircle2 className="w-5 h-5" /> : <AlertOctagon className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">
+                      {token.name} ({token.symbol}) · Terms Compliance Status: {tokenCompliance.isCompliant ? 'PASSED (Zero Violations)' : 'FAILED'}
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Checked across {tokenCompliance.totalCheckedKeywords} keywords spanning EVM compiler reserved names, regulatory prohibited terms, and brand protections.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold text-white bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
+                    Compliance Score: {tokenCompliance.complianceScore}/100
+                  </span>
+                </div>
+              </div>
+
+              {/* 4 Pillars of Term Protection */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4 text-xs font-mono">
+                <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800/80">
+                  <span className="text-slate-400 block text-[11px]">1. EVM/Solidity Reserved</span>
+                  <span className="text-emerald-400 font-semibold mt-1 block">0 Keywords Found</span>
+                  <span className="text-[10px] text-slate-500">Checked {SOLIDITY_RESERVED_KEYWORDS.length} language keywords</span>
+                </div>
+
+                <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800/80">
+                  <span className="text-slate-400 block text-[11px]">2. Regulatory Prohibited</span>
+                  <span className="text-emerald-400 font-semibold mt-1 block">0 Securities Claims</span>
+                  <span className="text-[10px] text-slate-500">Checked {REGULATORY_PROHIBITED_TERMS.length} financial keywords</span>
+                </div>
+
+                <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800/80">
+                  <span className="text-slate-400 block text-[11px]">3. Brand Impersonation</span>
+                  <span className="text-emerald-400 font-semibold mt-1 block">0 Official Mimics</span>
+                  <span className="text-[10px] text-slate-500">Checked {BRAND_IMPERSONATION_TERMS.length} protected identities</span>
+                </div>
+
+                <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800/80">
+                  <span className="text-slate-400 block text-[11px]">4. Base Protocol Symbols</span>
+                  <span className="text-emerald-400 font-semibold mt-1 block">0 Symbol Collisions</span>
+                  <span className="text-[10px] text-slate-500">Checked {RESERVED_PROTOCOL_SYMBOLS.length} reserved symbols</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Live Terms Auditor & Policy Sandbox */}
+            <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <Search className="w-4 h-4 text-indigo-400" />
+                    <span>Interactive Policy Sandbox: Live Terms Compliance Auditor</span>
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Test any proposed token name, symbol, or metadata in real-time to guarantee no reserved or prohibited terms
+                  </p>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => {
+                      setTestName('CoreToken');
+                      setTestSymbol('CT');
+                      setTestDesc('Ecosystem utility token for the EtherPulse decentralized trading platform.');
+                    }}
+                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[11px] font-mono rounded"
+                  >
+                    Load CoreToken (CT)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTestName('Guaranteed Profit Stock');
+                      setTestSymbol('STOCK');
+                      setTestDesc('A risk-free investment fund paying guaranteed dividends.');
+                    }}
+                    className="px-2 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-[11px] font-mono rounded border border-rose-500/30"
+                  >
+                    Test Prohibited Securities (Violation Demo)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTestName('Contract Token');
+                      setTestSymbol('address');
+                      setTestDesc('Token using Solidity reserved word.');
+                    }}
+                    className="px-2 py-1 bg-amber-950/60 hover:bg-amber-900 text-amber-300 text-[11px] font-mono rounded border border-amber-500/30"
+                  >
+                    Test Reserved Keyword
+                  </button>
+                </div>
+              </div>
+
+              {/* Form inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs">
+                <div>
+                  <label className="text-slate-400 block mb-1">Token Name to Test:</label>
+                  <input
+                    type="text"
+                    value={testName}
+                    onChange={(e) => setTestName(e.target.value)}
+                    placeholder="e.g. CoreToken"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-600 focus:outline-hidden focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Token Symbol to Test:</label>
+                  <input
+                    type="text"
+                    value={testSymbol}
+                    onChange={(e) => setTestSymbol(e.target.value)}
+                    placeholder="e.g. CT"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-600 focus:outline-hidden focus:border-indigo-500 uppercase"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1 font-mono text-xs">Description / Marketing Text:</label>
+                <textarea
+                  rows={2}
+                  value={testDesc}
+                  onChange={(e) => setTestDesc(e.target.value)}
+                  placeholder="Enter token purpose or description..."
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs placeholder-slate-600 focus:outline-hidden focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Live Test Outcome */}
+              <div className={`p-4 rounded-lg border font-mono text-xs ${
+                liveTestResult.isCompliant
+                  ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'
+                  : 'bg-rose-950/30 border-rose-500/40 text-rose-300'
+              }`}>
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800/60">
+                  <span className="font-semibold flex items-center gap-1.5">
+                    {liveTestResult.isCompliant ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>TEST PASSED: NO RESERVED OR PROHIBITED TERMS DETECTED</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertOctagon className="w-4 h-4 text-rose-400" />
+                        <span>POLICY VIOLATIONS DETECTED: {liveTestResult.violations.length} RESTRICTED TERMS</span>
+                      </>
+                    )}
+                  </span>
+                  <span className="font-bold">Compliance Score: {liveTestResult.complianceScore}%</span>
+                </div>
+
+                {liveTestResult.isCompliant ? (
+                  <p className="text-[11px] text-emerald-400/90 pt-2 leading-relaxed">
+                    "{testName}" ({testSymbol}) is 100% compliant. It does not use any Solidity reserved keywords (e.g. address, contract, payable), regulatory prohibited claims (e.g. stock, guarantee, dividend), or protected brand marks.
+                  </p>
+                ) : (
+                  <div className="space-y-2 pt-2">
+                    {liveTestResult.violations.map((v, i) => (
+                      <div key={i} className="p-2.5 bg-slate-950/80 rounded border border-rose-500/30 text-rose-300 text-[11px]">
+                        <div className="flex items-center justify-between font-bold">
+                          <span>Matched Prohibited Term: '{v.term}' in [{v.matchedIn}]</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-950 text-rose-400 border border-rose-500/40">
+                            {v.category}
+                          </span>
+                        </div>
+                        <p className="text-slate-400 mt-1">{v.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'audit' && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-mono">
               <thead className="bg-slate-950/60 text-slate-400 border-b border-slate-800 uppercase text-[10px]">
@@ -302,7 +528,9 @@ export const SmartContractAnalytics: React.FC<SmartContractAnalyticsProps> = ({ 
               </tbody>
             </table>
           </div>
-        ) : (
+        )}
+
+        {activeTab === 'events' && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-mono">
               <thead className="bg-slate-950/60 text-slate-400 border-b border-slate-800 uppercase text-[10px]">

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Copy, Check, ExternalLink, ShieldCheck, AlertTriangle, Coins, TrendingUp, TrendingDown, Layers, ArrowUpRight } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Copy, Check, ExternalLink, ShieldCheck, AlertTriangle, Coins, TrendingUp, TrendingDown, Layers, ArrowUpRight, CheckCircle2 } from 'lucide-react';
 import { TokenProfile } from '../types/token';
+import { checkTermsCompliance } from '../utils/complianceValidator';
 
 interface TokenOverviewBannerProps {
   token: TokenProfile;
@@ -12,6 +13,10 @@ export const TokenOverviewBanner: React.FC<TokenOverviewBannerProps> = ({
   currentPrice
 }) => {
   const [copied, setCopied] = useState(false);
+
+  const compliance = useMemo(() => {
+    return checkTermsCompliance(token.name, token.symbol, token.description || '');
+  }, [token.name, token.symbol, token.description]);
 
   const copyAddress = () => {
     navigator.clipboard.writeText(token.address);
@@ -52,6 +57,15 @@ export const TokenOverviewBanner: React.FC<TokenOverviewBannerProps> = ({
                     <span>Verified Bytecode</span>
                   </span>
                 )}
+                <span className="text-xs text-slate-400">·</span>
+                <span className={`inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded border ${
+                  compliance.isCompliant
+                    ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30'
+                    : 'bg-rose-950/60 text-rose-400 border-rose-500/30'
+                }`}>
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>No Reserved or Prohibited Terms: {compliance.isCompliant ? 'Verified (0 Violations)' : 'Flagged'}</span>
+                </span>
               </div>
 
               {/* Contract address copy & Etherscan */}

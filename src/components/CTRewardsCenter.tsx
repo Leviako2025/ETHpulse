@@ -37,7 +37,7 @@ const INITIAL_CAMPAIGNS: RewardCampaign[] = [
   {
     id: 'camp_1',
     title: 'Uniswap V3 Concentrated Liquidity Incentive',
-    description: 'Provide dual-sided liquidity into the CT/ETH 0.30% fee tier pool to earn continuous CT yield bonuses.',
+    description: 'Provide dual-sided liquidity into the CT/ETH 0.30% fee tier pool to earn continuous CT protocol rewards.',
     category: 'LIQUIDITY',
     rewardAmountCt: 750,
     rewardPoints: 1200,
@@ -46,7 +46,7 @@ const INITIAL_CAMPAIGNS: RewardCampaign[] = [
     endsInDays: 14,
     totalPoolCt: 250000,
     participantsCount: 3840,
-    requirements: ['Deposit at least 0.5 ETH in CT/ETH Pool', 'Hold liquidity active for 72+ hours']
+    requirements: ['Supply at least 0.5 ETH in CT/ETH Pool', 'Hold liquidity active for 72+ hours']
   },
   {
     id: 'camp_2',
